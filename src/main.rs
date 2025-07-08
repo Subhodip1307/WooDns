@@ -79,8 +79,9 @@ async fn handle_dns_query(
         }
         else{
             println!("request recived for {domain} , not resolved ");
-            return Err(anyhow::anyhow!("Domain not found"));
-
+            let upstream_response = forward_to_upstream_dns(&data).await?;
+            socket.send_to(&upstream_response, src).await?;
+            return Ok(());
         }
 
         response.add_query(query.clone());
@@ -92,4 +93,15 @@ async fn handle_dns_query(
 
     socket.send_to(&resp_buffer, src).await?;
     Ok(())
+}
+
+
+async fn forward_to_upstream_dns(data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let upstream_addr = "8.8.8.8:53";
+    let upstream_socket = tokio::net::UdpSocket::bind("0.0.0.0:0").await?;
+    upstream_socket.send_to(data, upstream_addr).await?;
+
+    let mut buf = [0u8; 512];
+    let (len, _) = upstream_socket.recv_from(&mut buf).await?;
+    Ok(buf[..len].to_vec())
 }
