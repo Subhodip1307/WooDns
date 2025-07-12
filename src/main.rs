@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc,env};
 
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
@@ -12,17 +12,21 @@ use docker::gather_docker;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let dns_store = Arc::new(RwLock::new(HashMap::from([
-        ("otherdns.".to_string(), "8.8.8.8".to_string())
-    ])));
+    let dns_store = Arc::new(RwLock::new(HashMap::new()));
     let writer_hasmap = Arc::clone(&dns_store);
 
     tokio::spawn(async move{
         let _ =gather_docker(writer_hasmap).await;
     });
-    
-    let socket = Arc::new(UdpSocket::bind("127.0.0.13:53").await?);
-    println!("DNS server listening on 127.0.0.13 UDP port 53");
+
+
+    let mut address=String::from("127.0.0.13");
+    match env::var("host") {
+        Ok(val) => address=val,
+        Err(_) => println!("No Environment variable given"),
+    }
+    let socket = Arc::new(UdpSocket::bind(format!("{}:53",address)).await?);
+    println!("DNS server listening on {address} UDP port 53");
 
     
 

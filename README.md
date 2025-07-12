@@ -77,7 +77,8 @@ This project is still under active development.
     Group=woodns
     Restart=on-failure
     AmbientCapabilities=CAP_NET_BIND_SERVICE
-
+    # To run on different address(optional), default address is 127.0.0.13
+    # Environment="host=127.0.x.x"
     [Install]
     WantedBy=multi-user.target
     ```
@@ -108,7 +109,8 @@ This project is still under active development.
 Edit `/etc/resolv.conf` (or your systemd-resolved drop-in):
 
 ```
-nameserver 127.0.0.13
+syntax:  nameserver <dns_server_runing_address>
+example: nameserver 127.0.0.13
 ```
 
 > **Note:** Place WooDns at the top.
