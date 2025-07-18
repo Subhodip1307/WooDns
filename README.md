@@ -104,16 +104,23 @@ This project is still under active development.
 
 ---
 
-### 3. Point System DNS to WooDns
+### 3. Configure systemd-resolved to Use WooDns
 
-Edit `/etc/resolv.conf` (or your systemd-resolved drop-in):
+1. **Edit resolved.conf:**
+    ```sh
+    sudo nano /etc/systemd/resolved.conf
+    ```
+    Add or modify the following in the `[Resolve]` section:
+    ```
+    [Resolve]
+    DNS=127.0.0.13
+    ```
+    Replace `127.0.0.13` with the IP address where WooDns is running if different.
 
-```
-syntax:  nameserver <dns_server_runing_address>
-example: nameserver 127.0.0.13
-```
-
-> **Note:** Place WooDns at the top.
+2. **Restart systemd-resolved:**
+    ```sh
+    sudo systemctl restart systemd-resolved
+    ```
 
 ---
 
@@ -130,8 +137,8 @@ docker container ls
 # a1b2c3d4e5f6   nginx:alpine "nginx -g 'daemon of…"   nginx_demo
 # 2345f6a7b8c9   redis:alpine "docker-entrypoint.s…"   redis_cache
 
-# Copy a container name (e.g., nginx_demo) and ping it:
-ping nginx_demo
+# To ping a container, use the format:
+ping nginx_demo.docker
 
 # You should see replies from the container's internal IP!
 ```
@@ -140,26 +147,27 @@ ping nginx_demo
 
 ## 🔄 Use Container Names in Host Applications
 
-Thanks to WooDns, you can now use Docker container names **anywhere on your host machine** where a hostname is accepted, such as:
+Thanks to WooDns, you can now use Docker container names (with the `.docker` suffix) **anywhere on your host machine** where a hostname is accepted, such as:
 
 - **Nginx reverse proxy configs**:
     ```nginx
     upstream backend {
-        server redis_cache:6379;  # Use the container name directly!
+        server redis_cache.docker:6379;  # Use the container name with .docker!
     }
     ```
 - **Other application configs** (e.g., databases, microservices, etc.):
     ```
-    host = nginx_demo
+    host = nginx_demo.docker
     ```
 
-No more looking up or hardcoding container IPs—just use the container name!
+No more looking up or hardcoding container IPs—just use the container name with `.docker`!
 
 ---
 
+
 ## 🛠️ How It Works
 
-- Resolves Docker container names to their IPs automatically.
+- Resolves Docker container names (with `.docker` suffix) to their IPs automatically.
 - If a queried name is not a Docker container, WooDns forwards the request to your upstream DNS (e.g., 8.8.8.8).
 - No need for port exposure or manual `/etc/hosts` editing.
 

@@ -24,7 +24,7 @@ pub async fn  gather_docker(data:Arc<RwLock<HashMap<String,String>>>)->Result<()
         .iter()
         .map(|n| n.trim_start_matches('/').to_string())
         .collect::<Vec<String>>()
-        .join(", ")+".";
+        .join(", ")+".docker.";
 
         let ip_address = container
         .network_settings
