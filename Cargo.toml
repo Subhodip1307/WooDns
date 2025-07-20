@@ -8,3 +8,4 @@ anyhow = "1.0.98"
 bollard = "0.19.1"
 tokio = { version = "1.46.1", features = ["full"] }
 trust-dns-proto = "0.23.2"
+futures-util = "0.3"

@@ -55,11 +55,11 @@ This project is still under active development.
 
 ### 2. Deploy with systemd
 
-1. **Move the executable** to `/usr/local/bin/woodns`:
+1. **Move the executable** to `/usr/local/bin/`:
 
     ```sh
-    sudo mv target/release/woodns /usr/local/bin/woodns
-    sudo chmod +x /usr/local/bin/woodns
+    sudo mv target/release/WooDns-linux-amd64 /usr/local/bin/
+    sudo chmod +x /usr/local/bin/WooDns-linux-amd64
     ```
 
 2. **Create a systemd service file:**
@@ -71,7 +71,7 @@ This project is still under active development.
     After=network.target docker.service
 
     [Service]
-    ExecStart=/usr/local/bin/woodns
+    ExecStart=/usr/local/bin/WooDns-linux-amd64
     # Change this to the user you want to run WooDns as
     User=woodns
     Group=woodns
@@ -86,7 +86,7 @@ This project is still under active development.
 3. **Permissions:**
 
     - The `User` specified (here, `woodns`) **must**:
-      - Have execute permissions on `/usr/local/bin/woodns`
+      - Have execute permissions on `/usr/local/bin/WooDns-linux-amd64`
       - Have permissions to run Docker commands (typically by being in the `docker` group):
         ```sh
         sudo usermod -aG docker woodns

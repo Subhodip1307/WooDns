@@ -1552,6 +1552,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bollard",
+ "futures-util",
  "tokio",
  "trust-dns-proto",
 ]

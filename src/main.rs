@@ -8,17 +8,22 @@ use trust_dns_proto::rr::{RData, Record};
 use trust_dns_proto::serialize::binary::{BinDecodable, BinEncodable, BinEncoder};
 mod docker;
 use docker::gather_docker;
+use docker::event_monitor;
 
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let dns_store = Arc::new(RwLock::new(HashMap::new()));
     let writer_hasmap = Arc::clone(&dns_store);
+    let update_hasmap = Arc::clone(&dns_store);
 
     tokio::spawn(async move{
         let _ =gather_docker(writer_hasmap).await;
     });
 
+    tokio::spawn(async move {
+        let _ =event_monitor(update_hasmap).await;
+    });
 
     let mut address=String::from("127.0.0.13");
     match env::var("host") {
