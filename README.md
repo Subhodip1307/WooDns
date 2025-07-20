@@ -6,18 +6,20 @@
 
 > 🚀 A lightweight, blazing-fast local DNS server written in Rust. Maps Docker container names to their internal IPs, and seamlessly forwards all other DNS queries to your upstream resolver.
 
----
-
-## ✨ Features
-
-- 🔧 **Resolve Docker container names** to their internal IPs instantly
-- 🌍 **Automatic forwarding** of all other DNS queries to your upstream DNS (like 8.8.8.8)
-- 🐳 No need to expose container ports to the host
-- ⚡ Built with Rust async for performance and reliability
-- 🛠️ Easy integration via `/etc/resolv.conf` or `systemd-resolved`
-- 📦 Minimal dependencies, single binary
 
 ---
+
+## 🚀 Why WooDns?
+
+- 🎯 **Fast & Lightweight** – Built with async Rust, optimized for performance.
+- 🐳 **Docker-Aware** – Automatically resolves container names (`*.docker`) to their internal IPs.
+- 🔁 **Live Updates** – Dynamically tracks Docker events to add or remove DNS records in real time when containers start or stop.
+- 🌐 **Full DNS Compatibility** – Forwards all non-Docker queries to your preferred upstream DNS (e.g., Google DNS).
+- 🔄 **Zero Configuration** – Easily integrate with `/etc/resolv.conf` or `systemd-resolved`.
+- 📦 **Single Binary** – Only one Rust executable, no extra dependencies.
+
+---
+
 
 ## ⚠️ Project Status: In Development
 
@@ -27,8 +29,6 @@ This project is still under active development.
 > Contributions, bug reports, and suggestions are highly welcome!
 
 ---
-
-
 
 ## 🚀 Quick Start
 
@@ -55,11 +55,11 @@ This project is still under active development.
 
 ### 2. Deploy with systemd
 
-1. **Move the executable** to `/usr/local/bin/woodns`:
+1. **Move the executable** to `/usr/local/bin/`:
 
     ```sh
-    sudo mv target/release/woodns /usr/local/bin/woodns
-    sudo chmod +x /usr/local/bin/woodns
+    sudo mv target/release/WooDns-linux-amd64 /usr/local/bin/
+    sudo chmod +x /usr/local/bin/WooDns-linux-amd64
     ```
 
 2. **Create a systemd service file:**
@@ -71,7 +71,7 @@ This project is still under active development.
     After=network.target docker.service
 
     [Service]
-    ExecStart=/usr/local/bin/woodns
+    ExecStart=/usr/local/bin/WooDns-linux-amd64
     # Change this to the user you want to run WooDns as
     User=woodns
     Group=woodns
@@ -86,7 +86,7 @@ This project is still under active development.
 3. **Permissions:**
 
     - The `User` specified (here, `woodns`) **must**:
-      - Have execute permissions on `/usr/local/bin/woodns`
+      - Have execute permissions on `/usr/local/bin/WooDns-linux-amd64`
       - Have permissions to run Docker commands (typically by being in the `docker` group):
         ```sh
         sudo usermod -aG docker woodns

@@ -8,17 +8,23 @@ use trust_dns_proto::rr::{RData, Record};
 use trust_dns_proto::serialize::binary::{BinDecodable, BinEncodable, BinEncoder};
 mod docker;
 use docker::gather_docker;
+use docker::event_monitor;
+use trust_dns_proto::op::ResponseCode;
 
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let dns_store = Arc::new(RwLock::new(HashMap::new()));
     let writer_hasmap = Arc::clone(&dns_store);
+    let update_hasmap = Arc::clone(&dns_store);
 
     tokio::spawn(async move{
         let _ =gather_docker(writer_hasmap).await;
     });
 
+    tokio::spawn(async move {
+        let _ =event_monitor(update_hasmap).await;
+    });
 
     let mut address=String::from("127.0.0.13");
     match env::var("host") {
@@ -82,10 +88,47 @@ async fn handle_dns_query(
         println!("request recived for {} , reolved to {}",domain,ip_str);
         }
         else{
-            println!("request recived for {domain} , not resolved ");
-            let upstream_response = forward_to_upstream_dns(&data).await?;
-            socket.send_to(&upstream_response, src).await?;
+            println!("request received for {domain}, forwarding to upstream");
+
+          
+            let upstream_bytes = forward_to_upstream_dns(&data).await?;
+
+           
+            let upstream_msg = match Message::from_bytes(&upstream_bytes) {
+                Ok(m) => m,
+                Err(err) => {
+                    eprintln!("Failed to parse upstream DNS reply: {:?}", err);
+                    
+                    response.set_response_code(ResponseCode::ServFail);
+                    let mut buf = Vec::with_capacity(512);
+                    let mut enc = BinEncoder::new(&mut buf);
+                    response.emit(&mut enc)?;
+                    socket.send_to(&buf, src).await?;
+                    return Ok(());
+                }
+            };
+
+           
+            response.set_recursion_available(true);
+            for answer in upstream_msg.answers() {
+                response.add_answer(answer.clone());
+            }
+            for auth in upstream_msg.name_servers() {
+                response.add_name_server(auth.clone());
+            }
+            for add in upstream_msg.additionals() {
+                response.add_additional(add.clone());
+            }
+
+            
+            let mut resp_buffer = Vec::with_capacity(512);
+            {
+                let mut encoder = BinEncoder::new(&mut resp_buffer);
+                response.emit(&mut encoder)?;
+            }
+            socket.send_to(&resp_buffer, src).await?;
             return Ok(());
+
         }
 
         response.add_query(query.clone());
