@@ -8,6 +8,9 @@ use std::{collections::HashMap,sync::Arc};
 use bollard::query_parameters::EventsOptions;
 use futures_util::stream::StreamExt;
 use bollard::models::EventMessageTypeEnum;
+use bollard::models::EventMessage;
+
+// TODO: Create a Singel Function to collect name of container from EventMessage
 
 
 pub async fn  gather_docker(data:Arc<RwLock<HashMap<String,String>>>)->Result<(), Box<dyn Error>>{
@@ -46,29 +49,18 @@ pub async fn event_monitor(data:Arc<RwLock<HashMap<String,String>>>) {
     let mut events = docker.events(Some(EventsOptions::default())).boxed();
     
     while let Some(Ok(event)) = events.next().await {
-        // println!("{:#?}", event);
+        
         if event.typ == Some(EventMessageTypeEnum::CONTAINER) {
+            // println!("{:#?}", event);
             if let Some(ref action) = event.action {
                 match action.as_str() {
-                    "start" | "connect" => {
+                    "start"  => {
                         println!("Docker Started");
                     }
                     "kill" => {
-                        if let Some(actor) = &event.actor {
-                            if let Some(attributes) = &actor.attributes {
-                                if let Some(name) = attributes.get("name") {
-                                    println!("docker Container Stoped: {name} ");
-                                //    removeing the key
-                                    let mut map_write = data.write().await;
-                                    if let Some(_)=map_write.remove(&format!("{name}.docker.")){
-                                        println!("{name} Removed from DNS list");
-                                    } else{
-                                        println!("{name} Not found in DNS List");
-                                    }
-                                }
-                            }
-                        }
-                       
+                        if let Err(_) = handle_stopped_container(&event, &data).await {
+                            println!("Failed to remove container from DNS");
+                        }       
                     }
                     _ => {}
                 }
@@ -79,3 +71,34 @@ pub async fn event_monitor(data:Arc<RwLock<HashMap<String,String>>>) {
 
 
 
+// remove the stoped containers from records list
+async fn handle_stopped_container(event:&EventMessage,data:&Arc<RwLock<HashMap<String,String>>>)->Result<(), ()>{
+    if let Some(actor) = &event.actor {
+        if let Some(attributes) = &actor.attributes {
+            if let Some(name) = attributes.get("name") {
+                println!("docker Container Stoped: {name} ");
+                let mut map_write = data.write().await;
+                if let Some(_)=map_write.remove(&format!("{name}.docker.")){
+                    println!("{name} Removed from DNS list");
+                } else{
+                    println!("{name} Not found in DNS List");
+                }
+                return Ok(());
+            }
+        }
+    }
+    Err(())
+}
+
+async fn handle_started_container(event:&EventMessage)->Result<(&String), ()>{
+    if let Some(actor) = &event.actor {
+        if let Some(attributes) = &actor.attributes {
+            if let Some(name) = attributes.get("name") {
+                println!("New Docker Container detected {name}");
+                return Ok(name);
+            }
+        }
+    }
+    Err(())
+
+}
