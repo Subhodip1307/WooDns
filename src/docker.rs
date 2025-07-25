@@ -9,7 +9,8 @@ use bollard::query_parameters::EventsOptions;
 use futures_util::stream::StreamExt;
 use bollard::models::EventMessageTypeEnum;
 use bollard::models::EventMessage;
-
+use bollard::query_parameters::InspectContainerOptionsBuilder;
+// use bollard::container::ContainerInspectResponse;
 // TODO: Create a Singel Function to collect name of container from EventMessage
 
 
@@ -55,9 +56,11 @@ pub async fn event_monitor(data:Arc<RwLock<HashMap<String,String>>>) {
             if let Some(ref action) = event.action {
                 match action.as_str() {
                     "start"  => {
-                        println!("Docker Started");
+                        if let Ok(_)=handle_started_container(&event,&docker,&data).await{
+                            println!("current dns {:#?}",data);
+                        }//end ok 
                     }
-                    "kill" => {
+                    "kill" | "die" | "stop" => {
                         if let Err(_) = handle_stopped_container(&event, &data).await {
                             println!("Failed to remove container from DNS");
                         }       
@@ -90,15 +93,35 @@ async fn handle_stopped_container(event:&EventMessage,data:&Arc<RwLock<HashMap<S
     Err(())
 }
 
-async fn handle_started_container(event:&EventMessage)->Result<(&String), ()>{
+async fn handle_started_container(event:&EventMessage,docker: &Docker,data:&Arc<RwLock<HashMap<String,String>>>)->Result<(), ()>{
     if let Some(actor) = &event.actor {
         if let Some(attributes) = &actor.attributes {
             if let Some(name) = attributes.get("name") {
                 println!("New Docker Container detected {name}");
-                return Ok(name);
+                // getting the Ip of the new contaienr
+                if let Some(container_ip_address)=get_container_ip(&docker,name).await{
+                    let mut map_write = data.write().await;//write data into the stroage
+                    println!("container name is {name} and it's ip is {container_ip_address}");
+                    map_write.entry(format!("{name}.docker.").to_string()).or_insert(container_ip_address);  
+                }
+
+                return Ok(());
             }
         }
     }
     Err(())
+}
 
+// get ip from container name
+async fn get_container_ip(docker: &Docker, container_name: &str) -> Option<String> {
+    let options = InspectContainerOptionsBuilder::default()
+        .build();
+    let info = docker
+        .inspect_container(container_name, Some(options))
+        .await
+        .ok()?;
+
+    info.network_settings
+        .and_then(|ns| ns.networks)
+        .and_then(|nets| nets.values().find_map(|net| net.ip_address.clone()))
 }

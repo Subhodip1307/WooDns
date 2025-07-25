@@ -6,18 +6,19 @@
 
 > 🚀 A lightweight, blazing-fast local DNS server written in Rust. Maps Docker container names to their internal IPs, and seamlessly forwards all other DNS queries to your upstream resolver.
 
----
-
-## ✨ Features
-
-- 🔧 **Resolve Docker container names** to their internal IPs instantly
-- 🌍 **Automatic forwarding** of all other DNS queries to your upstream DNS (like 8.8.8.8)
-- 🐳 No need to expose container ports to the host
-- ⚡ Built with Rust async for performance and reliability
-- 🛠️ Easy integration via `/etc/resolv.conf` or `systemd-resolved`
-- 📦 Minimal dependencies, single binary
 
 ---
+
+## 🚀 Why WooDns?
+
+- 🎯 **Fast & Lightweight** – Built with async Rust, optimized for performance.
+- 🐳 **Docker-Aware** – Automatically resolves container names (`*.docker`) to their internal IPs.
+- 🌐 **Full DNS Compatibility** – Forwards all non-Docker queries to your preferred upstream DNS (e.g., Google DNS).
+- 🔄 **Zero Configuration** – Easily integrate with `/etc/resolv.conf` or `systemd-resolved`.
+- 📦 **Single Binary** – Only one Rust executable, no extra dependencies.
+
+---
+
 
 ## ⚠️ Project Status: In Development
 
@@ -27,8 +28,6 @@ This project is still under active development.
 > Contributions, bug reports, and suggestions are highly welcome!
 
 ---
-
-
 
 ## 🚀 Quick Start
 
