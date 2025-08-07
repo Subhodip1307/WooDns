@@ -4,7 +4,7 @@
 ![Language](https://img.shields.io/badge/Rust-stable-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> 🚀 A lightweight, blazing-fast local DNS server written in Rust. Maps Docker container names to their internal IPs, and seamlessly forwards all other DNS queries to your upstream resolver.
+> 🚀 WooDns is a lightweight, fast local DNS server written in Rust for Docker environments. It automatically maps Docker container names to their internal IPs, enabling seamless service discovery and container networking—without manual configuration, host networking, or exposing ports just to access container services.
 
 
 ---
@@ -12,14 +12,29 @@
 ## 🚀 Why WooDns?
 
 - 🎯 **Fast & Lightweight** – Built with async Rust, optimized for performance.
-- 🐳 **Docker-Aware** – Automatically resolves container names (`*.docker`) to their internal IPs.
+- 🐳 **Docker-Aware DNS Resolution** – Automatically resolves container names (`*.docker`) to their internal IPs, so you no longer need to use host networking or expose ports just to access container services.
 - 🔁 **Live Updates** – Dynamically tracks Docker events to add or remove DNS records in real time when containers start or stop.
 - 🌐 **Full DNS Compatibility** – Forwards all non-Docker queries to your preferred upstream DNS (e.g., Google DNS).
 - 🔄 **Zero Configuration** – Easily integrate with `/etc/resolv.conf` or `systemd-resolved`.
 - 📦 **Single Binary** – Only one Rust executable, no extra dependencies.
+- 👐 **Open Source** – MIT license, easy to contribute and audit.
 
----
+## Who Should Use WooDns?
 
+WooDns is ideal for:
+
+- 🛠️ **Effortless Container Networking for Development**  
+  Seamlessly access your containers by name, simplifying multi-container projects.
+- 🧩 **Microservices Testing**  
+  Quickly resolve service names to internal IPs for reliable integration and testing.
+- 🚀 **DevOps Teams Needing Dynamic DNS for Containers**  
+  Automatic DNS updates as containers start and stop, reducing manual network setup.
+- 🏠 **Self-Hosted Environments**  
+  Manage container networking in private labs or personal servers without external DNS.
+- 🧑‍💻 **CI/CD Pipeline Environments**  
+  Ensure repeatable, isolated network setups for automated testing and deployment.
+- 🔄 **Legacy Systems Modernization**  
+  Bridge old apps with new containerized services using DNS translation.
 
 ## ⚠️ Project Status: In Development
 
