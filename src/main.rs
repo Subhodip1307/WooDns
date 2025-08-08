@@ -1,82 +1,44 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc,sync::Mutex,env};
-use log::{info, warn, error};
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::io;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc,env};
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
 use trust_dns_proto::op::{Message, MessageType, OpCode};
 use trust_dns_proto::rr::{RData, Record};
 use trust_dns_proto::serialize::binary::{BinDecodable, BinEncodable, BinEncoder};
 mod docker;
+mod loggin;
+use loggin::DnsLogger;
 use docker::gather_docker;
 use docker::event_monitor;
 use trust_dns_proto::op::ResponseCode;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-// logging
-struct DnsLogger {
-    file:Arc<Mutex<std::fs::File>>,
-}
-
-impl DnsLogger {
-    fn new() ->Result<Self,std:io::Error>{
-        std::fs::create_dir_all("woodns")?;
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("woodns/output.log")?;
-    }
-    fn log(&self,message:String){
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let log_line = format!("[{}] {}\n", now, message);
-        
-        if let Ok(mut file) = self.file.lock() {
-            let _ = file.write_all(log_line.as_bytes());
-            let _ = file.flush();
-        }
-        
-        // Also print to console
-        println!("{}", log_line.trim());
-    }
-}
-
-
-
 
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-     let logger = Arc::new(DnsLogger::new()?);
-    
-    logger.log("🚀 Server starting...");
+    let logger = Arc::new(DnsLogger::new()?);
+    logger.log("Server starting...").await;
 
     let dns_store = Arc::new(RwLock::new(HashMap::new()));
     let writer_hasmap = Arc::clone(&dns_store);
     let update_hasmap = Arc::clone(&dns_store);
 
+    let docker_collection_log=Arc::clone(&logger);
     tokio::spawn(async move{
-        let _ =gather_docker(writer_hasmap).await;
-    });
-
+        let _ =gather_docker(writer_hasmap,docker_collection_log).await;
+    });//collect all dockers
     tokio::spawn(async move {
         let _ =event_monitor(update_hasmap).await;
-    });
-
+    });//track envents
+    
+    //check fot custom address
     let mut address=String::from("127.0.0.13");
     match env::var("host") {
         Ok(val) => address=val,
-        Err(_) => println!("No Environment variable given"),
+        Err(_) =>logger.log(&format!("No Environment variable given")).await,
     }
+
     let socket = Arc::new(UdpSocket::bind(format!("{}:53",address)).await?);
-    println!("DNS server listening on {address} UDP port 53");
-
+    logger.log(&format!("DNS server listening on {address} UDP port 53")).await;
     
-
     let mut buf = [0u8; 512];
 
     loop {
@@ -85,10 +47,11 @@ async fn main() -> anyhow::Result<()> {
 
         let store = Arc::clone(&dns_store);
         let socket = Arc::clone(&socket);
+        let access_logger=Arc::clone(&logger);
 
         tokio::spawn(async move {
-            if let Err(err) = handle_dns_query(data, src, store, socket).await {
-                eprintln!("Error handling query from {}: {:?}", src, err);
+            if let Err(err) = handle_dns_query(data, src, store, socket,access_logger.clone()).await {
+                access_logger.log(&format!("Error handling query from {}: {:?}", src, err)).await;
             }
         });
     }
@@ -98,7 +61,7 @@ async fn handle_dns_query(
     data: Vec<u8>,
     src: SocketAddr,
     store: Arc<RwLock<HashMap<String, String>>>,
-    socket: Arc<UdpSocket>,
+    socket: Arc<UdpSocket>,logger:Arc<DnsLogger>
 ) -> anyhow::Result<()> {
     let request = Message::from_bytes(&data)?;
     let mut response = Message::new();
@@ -126,20 +89,18 @@ async fn handle_dns_query(
                 );
                 response.add_answer(record);
             }
-        println!("request recived for {} , reolved to {}",domain,ip_str);
+        logger.log(&format!("request recived for {} , reolved to {}",domain,ip_str)).await;
         }
         else{
-            println!("request received for {domain}, forwarding to upstream");
-
-          
+            logger.log(&format!("request received for {domain}, forwarding to upstream")).await;
+                  
             let upstream_bytes = forward_to_upstream_dns(&data).await?;
 
            
             let upstream_msg = match Message::from_bytes(&upstream_bytes) {
                 Ok(m) => m,
                 Err(err) => {
-                    eprintln!("Failed to parse upstream DNS reply: {:?}", err);
-                    
+                    logger.log(&format!("Failed to parse upstream DNS reply: {:?}", err)).await;
                     response.set_response_code(ResponseCode::ServFail);
                     let mut buf = Vec::with_capacity(512);
                     let mut enc = BinEncoder::new(&mut buf);
@@ -183,7 +144,7 @@ async fn handle_dns_query(
     Ok(())
 }
 
-
+//forwarding the dns query to 8.8.8.8
 async fn forward_to_upstream_dns(data: &[u8]) -> anyhow::Result<Vec<u8>> {
     let upstream_addr = "8.8.8.8:53";
     let upstream_socket = tokio::net::UdpSocket::bind("0.0.0.0:0").await?;

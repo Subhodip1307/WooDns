@@ -4,14 +4,15 @@ use std::default::Default;
 use std::error::Error;
 use tokio::sync::RwLock;
 use std::{collections::HashMap,sync::Arc};
-
 use bollard::query_parameters::EventsOptions;
 use futures_util::stream::StreamExt;
 use bollard::models::EventMessageTypeEnum;
 use bollard::models::EventMessage;
 use bollard::query_parameters::InspectContainerOptionsBuilder;
+use crate::loggin::DnsLogger;
 
-pub async fn  gather_docker(data:Arc<RwLock<HashMap<String,String>>>)->Result<(), Box<dyn Error>>{
+
+pub async fn  gather_docker(data:Arc<RwLock<HashMap<String,String>>>,logger:Arc<DnsLogger>)->Result<(), Box<dyn Error>>{
     let mut write_me = data.write().await;
     let docker=Docker::connect_with_socket_defaults().unwrap();
     let options=ListContainersOptionsBuilder::default().build();
@@ -26,13 +27,14 @@ pub async fn  gather_docker(data:Arc<RwLock<HashMap<String,String>>>)->Result<()
                 for (_,settings) in networks {
                     if let Some(ip_address)=settings.ip_address {
                         write_me.entry(format!("{name}.docker.")/*container name*/).or_insert(ip_address); 
-                        println!("adding {name}.docker.");
+                        logger.log(&format!("adding {name}.docker.")).await;
                     }
                 }
                
             }
         }  
     }//end for loop
+    logger.log("Docker discovery complete").await;
     Ok(())
 }
 
