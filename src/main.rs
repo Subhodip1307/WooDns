@@ -1,8 +1,10 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc,env};
-
+use std::{collections::HashMap, net::SocketAddr, sync::Arc,sync::Mutex,env};
+use log::{info, warn, error};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::io;
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
-
 use trust_dns_proto::op::{Message, MessageType, OpCode};
 use trust_dns_proto::rr::{RData, Record};
 use trust_dns_proto::serialize::binary::{BinDecodable, BinEncodable, BinEncoder};
@@ -10,10 +12,49 @@ mod docker;
 use docker::gather_docker;
 use docker::event_monitor;
 use trust_dns_proto::op::ResponseCode;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+// logging
+struct DnsLogger {
+    file:Arc<Mutex<std::fs::File>>,
+}
+
+impl DnsLogger {
+    fn new() ->Result<Self,std:io::Error>{
+        std::fs::create_dir_all("woodns")?;
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("woodns/output.log")?;
+    }
+    fn log(&self,message:String){
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let log_line = format!("[{}] {}\n", now, message);
+        
+        if let Ok(mut file) = self.file.lock() {
+            let _ = file.write_all(log_line.as_bytes());
+            let _ = file.flush();
+        }
+        
+        // Also print to console
+        println!("{}", log_line.trim());
+    }
+}
+
+
+
 
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+     let logger = Arc::new(DnsLogger::new()?);
+    
+    logger.log("🚀 Server starting...");
+
     let dns_store = Arc::new(RwLock::new(HashMap::new()));
     let writer_hasmap = Arc::clone(&dns_store);
     let update_hasmap = Arc::clone(&dns_store);
