@@ -9,14 +9,14 @@ pub struct DnsLogger {
 }
 
 impl DnsLogger {
-    pub fn new() ->Result<Self,std::io::Error>{
-        std::fs::create_dir_all("woodns")?;
+    pub fn new(file_path:String) ->Result<Self,std::io::Error>{
+        std::fs::create_dir_all(&format!("{file_path}/woodns"))?;
         let file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open("woodns/output.log")?;
+            .open(&format!("{file_path}/woodns/output.log"))?;
         Ok(Self {
-            file:Mutex::new(file),
+            file:Mutex::new(file),  
         })
     }
     pub async fn log(&self,message:&str){

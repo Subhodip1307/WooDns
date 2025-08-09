@@ -14,7 +14,15 @@ use trust_dns_proto::op::ResponseCode;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let logger = Arc::new(DnsLogger::new()?);
+    //getting custom loggin path
+    let mut log_path=String::from("/var/log");
+    match env::var("woodns_log_path"){
+        Ok(value)=>log_path=value,
+        Err(_)=>println!("no woodns_log_path Environment variable given"),
+    }
+
+    let logger = Arc::new(DnsLogger::new(log_path)?);
+
     logger.log("Server starting...").await;
 
     let dns_store = Arc::new(RwLock::new(HashMap::new()));
@@ -22,18 +30,19 @@ async fn main() -> anyhow::Result<()> {
     let update_hasmap = Arc::clone(&dns_store);
 
     let docker_collection_log=Arc::clone(&logger);
+    let docker_event_log=Arc::clone(&logger);
     tokio::spawn(async move{
         let _ =gather_docker(writer_hasmap,docker_collection_log).await;
     });//collect all dockers
     tokio::spawn(async move {
-        let _ =event_monitor(update_hasmap).await;
+        let _ =event_monitor(update_hasmap,docker_event_log).await;
     });//track envents
     
     //check fot custom address
     let mut address=String::from("127.0.0.13");
     match env::var("host") {
         Ok(val) => address=val,
-        Err(_) =>logger.log(&format!("No Environment variable given")).await,
+        Err(_) =>logger.log("no Host Environment variable given").await,
     }
 
     let socket = Arc::new(UdpSocket::bind(format!("{}:53",address)).await?);
