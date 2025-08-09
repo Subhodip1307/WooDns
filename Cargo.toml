@@ -10,3 +10,4 @@ tokio = { version = "1.46.1", features = ["full"] }
 trust-dns-proto = "0.23.2"
 futures-util = "0.3"
 log = "0.4.27"
+chrono = { version = "0.4", features = ["clock"] }

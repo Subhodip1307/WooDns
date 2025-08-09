@@ -82,18 +82,20 @@ This project is still under active development.
     ```ini
     # /etc/systemd/system/woodns.service
     [Unit]
-    Description=WooDns Docker-aware local DNS server
+    Description=WooDns
     After=network.target docker.service
 
     [Service]
     ExecStart=/usr/local/bin/WooDns-linux-amd64
-    # Change this to the user you want to run WooDns as
+    # Change this to the user you want to run WooDns as root
     User=woodns
     Group=woodns
     Restart=on-failure
     AmbientCapabilities=CAP_NET_BIND_SERVICE
     # To run on different address(optional), default address is 127.0.0.13
     # Environment="host=127.0.x.x"
+    #To change the log path (optional), default address is '/var/log/'
+    #Environment="woodns_log_path=/mypath"
     [Install]
     WantedBy=multi-user.target
     ```
@@ -102,18 +104,18 @@ This project is still under active development.
 
     - The `User` specified (here, `woodns`) **must**:
       - Have execute permissions on `/usr/local/bin/WooDns-linux-amd64`
+      - Have Write permissions on `/var/log/` or the path in mentioned in 'woodns_log_path'
       - Have permissions to run Docker commands (typically by being in the `docker` group):
         ```sh
         sudo usermod -aG docker woodns
         ```
-      - Own or have read access to any config files if you add them
-
+    
 4. **Enable and start:**
 
     ```sh
     sudo systemctl daemon-reload
-    sudo systemctl enable woodns
     sudo systemctl start woodns
+    sudo systemctl enable woodns
     sudo systemctl status woodns
     ```
 

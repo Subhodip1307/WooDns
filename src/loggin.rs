@@ -1,8 +1,7 @@
 use tokio::sync::Mutex;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::time::{SystemTime, UNIX_EPOCH};
-
+use chrono::Local;
 // logging
 pub struct DnsLogger {
     file:Mutex<std::fs::File>,
@@ -20,13 +19,8 @@ impl DnsLogger {
         })
     }
     pub async fn log(&self,message:&str){
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
+        let now = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
         let log_line = format!("[{}] {}\n", now, message);
-        
         let mut file = self.file.lock().await ;
             let _ = file.write_all(log_line.as_bytes());
             let _ = file.flush();

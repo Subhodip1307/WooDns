@@ -1,6 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc,env};
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
+use tokio::time::{timeout, Duration};
 use trust_dns_proto::op::{Message, MessageType, OpCode};
 use trust_dns_proto::rr::{RData, Record};
 use trust_dns_proto::serialize::binary::{BinDecodable, BinEncodable, BinEncoder};
@@ -10,7 +11,6 @@ use loggin::DnsLogger;
 use docker::gather_docker;
 use docker::event_monitor;
 use trust_dns_proto::op::ResponseCode;
-
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -100,48 +100,35 @@ async fn handle_dns_query(
             }
         logger.log(&format!("request recived for {} , reolved to {}",domain,ip_str)).await;
         }
-        else{
-            logger.log(&format!("request received for {domain}, forwarding to upstream")).await;
-                  
-            let upstream_bytes = forward_to_upstream_dns(&data).await?;
+       else {
+    logger.log(&format!("Request for {domain} not found locally, forwarding to upstream")).await;
+    
+    match forward_to_upstream_dns(&data).await {
+        Ok(upstream_bytes) => {
+            if let Ok(upstream_msg) = Message::from_bytes(&upstream_bytes) {
+                response.set_recursion_available(true);
+                response.add_query(query.clone());
 
-           
-            let upstream_msg = match Message::from_bytes(&upstream_bytes) {
-                Ok(m) => m,
-                Err(err) => {
-                    logger.log(&format!("Failed to parse upstream DNS reply: {:?}", err)).await;
-                    response.set_response_code(ResponseCode::ServFail);
-                    let mut buf = Vec::with_capacity(512);
-                    let mut enc = BinEncoder::new(&mut buf);
-                    response.emit(&mut enc)?;
-                    socket.send_to(&buf, src).await?;
-                    return Ok(());
+                for answer in upstream_msg.answers() {
+                    response.add_answer(answer.clone());
                 }
-            };
-
-           
-            response.set_recursion_available(true);
-            for answer in upstream_msg.answers() {
-                response.add_answer(answer.clone());
+                for auth in upstream_msg.name_servers() {
+                    response.add_name_server(auth.clone());
+                }
+                for add in upstream_msg.additionals() {
+                    response.add_additional(add.clone());
+                }
+            } else {
+                logger.log("Failed to parse upstream DNS reply").await;
+                response.set_response_code(ResponseCode::ServFail);
             }
-            for auth in upstream_msg.name_servers() {
-                response.add_name_server(auth.clone());
-            }
-            for add in upstream_msg.additionals() {
-                response.add_additional(add.clone());
-            }
-
-            
-            let mut resp_buffer = Vec::with_capacity(512);
-            {
-                let mut encoder = BinEncoder::new(&mut resp_buffer);
-                response.emit(&mut encoder)?;
-            }
-            socket.send_to(&resp_buffer, src).await?;
-            return Ok(());
-
         }
-
+        Err(e) => {
+            logger.log(&format!("Error contacting upstream: {:?}", e)).await;
+            response.set_response_code(ResponseCode::ServFail);
+        }
+    }
+}
         response.add_query(query.clone());
     }
 
@@ -160,6 +147,11 @@ async fn forward_to_upstream_dns(data: &[u8]) -> anyhow::Result<Vec<u8>> {
     upstream_socket.send_to(data, upstream_addr).await?;
 
     let mut buf = [0u8; 512];
-    let (len, _) = upstream_socket.recv_from(&mut buf).await?;
-    Ok(buf[..len].to_vec())
+    let recv_result = timeout(Duration::from_secs(4), upstream_socket.recv_from(&mut buf)).await;
+    
+    match recv_result {
+        Ok(Ok((len, _))) => Ok(buf[..len].to_vec()),
+        Ok(Err(e)) => Err(e.into()),
+        Err(_) => Err(anyhow::anyhow!("Upstream DNS request timed out")),
+    }
 }

@@ -52,7 +52,7 @@ pub async fn event_monitor(data:Arc<RwLock<HashMap<String,String>>>,event_logger
                 match action.as_str() {
                     "start"  => {
                         if let Ok(_)=handle_started_container(&event,&docker,&data,event_log).await{
-                            println!("current dns {:#?}",data);
+                            println!("DNS Record Updated");
                         }//end ok 
                     }
                     "kill" | "die" | "stop" => {
@@ -74,9 +74,10 @@ async fn handle_stopped_container(event:&EventMessage,data:&Arc<RwLock<HashMap<S
     if let Some(actor) = &event.actor {
         if let Some(attributes) = &actor.attributes {
             if let Some(name) = attributes.get("name") {
-                logger.log(&format!("docker Container Stoped: {name} ")).await;
+                // name = stoped container name
                 let mut map_write = data.write().await;
                 if let Some(_)=map_write.remove(&format!("{name}.docker.")){
+                    logger.log(&format!("docker Container Stoped: {name} ")).await;
                     logger.log(&format!("{name} Removed from DNS list")).await;
                 } else{
                     println!("{name} Not found in DNS List");
