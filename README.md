@@ -14,7 +14,7 @@
 - 🎯 **Fast & Lightweight** – Built with async Rust, optimized for performance.
 - 🐳 **Docker-Aware DNS Resolution** – Automatically resolves container names (`*.docker`) to their internal IPs, so you no longer need to use host networking or expose ports just to access container services.
 - 🔁 **Live Updates** – Dynamically tracks Docker events to add or remove DNS records in real time when containers start or stop.
-- 🌐 **Full DNS Compatibility** – Forwards all non-Docker queries to your preferred upstream DNS (e.g., Google DNS).
+- 🌐 **Full DNS Compatibility** – Forwards all non-Docker queries to your preferred upstream DNS (e.g., Google DNS,Custom DNS).
 - 🔄 **Zero Configuration** – Easily integrate with `/etc/resolv.conf` or `systemd-resolved`.
 - 📦 **Single Binary** – Only one Rust executable, no extra dependencies.
 - 👐 **Open Source** – MIT license, easy to contribute and audit.
@@ -92,6 +92,7 @@ This project is still under active development.
     Group=woodns
     Restart=on-failure
     AmbientCapabilities=CAP_NET_BIND_SERVICE
+    Environment="fallback=127.0.x.x"
     # To run on different address(optional), default address is 127.0.0.13
     # Environment="host=127.0.x.x"
     #To change the log path (optional), default address is '/var/log/'
@@ -99,6 +100,12 @@ This project is still under active development.
     [Install]
     WantedBy=multi-user.target
     ```
+
+    To ensure proper functionality, your software requires setting an environment variable named fallback with the IP address of a DNS server. We recommend using a local DNS server for optimal performance.
+    
+    ### Recommended Approach
+    - Extract the IP address of a nameserver from your system's DNS configuration file /etc/resolv.conf. You can use the first nameserver listed or any other nameserver IP address that suits your needs.
+    - Set the fallback environment variable to the extracted IP address.
 
 3. **Permissions:**
 
