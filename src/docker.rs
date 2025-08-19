@@ -28,9 +28,7 @@ pub async fn gather_docker(
             if let Some(networks) = container.network_settings.and_then(|ns| ns.networks) {
                 for (_, settings) in networks {
                     if let Some(ip_address) = settings.ip_address {
-                        write_me
-                            .entry(format!("{name}.docker.") /*container name*/)
-                            .or_insert(ip_address);
+                        write_me.insert(format!("{name}.docker."),ip_address);
                         logger.log(&format!("adding {name}.docker.")).await;
                     }
                 }
@@ -120,9 +118,7 @@ async fn handle_started_container(
                             "container name is {name} and it's ip is {container_ip_address}"
                         ))
                         .await;
-                    map_write
-                        .entry(format!("{name}.docker.").to_string())
-                        .or_insert(container_ip_address);
+                    map_write.insert(format!("{name}.docker."),container_ip_address);
                 }
 
                 return Ok(());
