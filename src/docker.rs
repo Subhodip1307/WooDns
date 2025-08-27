@@ -28,7 +28,7 @@ pub async fn gather_docker(
             if let Some(networks) = container.network_settings.and_then(|ns| ns.networks) {
                 for (_, settings) in networks {
                     if let Some(ip_address) = settings.ip_address {
-                        write_me.insert(format!("{name}.docker."),ip_address);
+                        write_me.insert(format!("{name}.docker."), ip_address);
                         logger.log(&format!("adding {name}.docker.")).await;
                     }
                 }
@@ -78,9 +78,9 @@ async fn handle_stopped_container(
     data: &Arc<RwLock<HashMap<String, String>>>,
     logger: Arc<DnsLogger>,
 ) -> Result<(), ()> {
-    if let Some(actor) = &event.actor {
-        if let Some(attributes) = &actor.attributes {
-            if let Some(name) = attributes.get("name") {
+    if let Some(actor) = &event.actor &&
+        let Some(attributes) = &actor.attributes &&
+             let Some(name) = attributes.get("name") {
                 // name = stoped container name
                 let mut map_write = data.write().await;
                 if (map_write.remove(&format!("{name}.docker."))).is_some() {
@@ -93,8 +93,8 @@ async fn handle_stopped_container(
                 }
                 return Ok(());
             }
-        }
-    }
+        
+    
     Err(())
 }
 
@@ -104,9 +104,9 @@ async fn handle_started_container(
     data: &Arc<RwLock<HashMap<String, String>>>,
     logger: Arc<DnsLogger>,
 ) -> Result<(), ()> {
-    if let Some(actor) = &event.actor {
-        if let Some(attributes) = &actor.attributes {
-            if let Some(name) = attributes.get("name") {
+    if let Some(actor) = &event.actor &&
+        let Some(attributes) = &actor.attributes 
+           && let Some(name) = attributes.get("name") {
                 logger
                     .log(&format!("New Docker Container detected {name}"))
                     .await;
@@ -118,13 +118,12 @@ async fn handle_started_container(
                             "container name is {name} and it's ip is {container_ip_address}"
                         ))
                         .await;
-                    map_write.insert(format!("{name}.docker."),container_ip_address);
+                    map_write.insert(format!("{name}.docker."), container_ip_address);
                 }
 
                 return Ok(());
             }
-        }
-    }
+    
     Err(())
 }
 

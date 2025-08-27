@@ -102,8 +102,8 @@ async fn handle_dns_query(
             db.get(&domain).cloned()
         };
 
-        if let Some(ip_str) = ip_opt {
-            if let Ok(ip) = ip_str.parse::<std::net::Ipv4Addr>() {
+        if let Some(ip_str) = ip_opt &&
+             let Ok(ip) = ip_str.parse::<std::net::Ipv4Addr>() {
                 let record = Record::from_rdata(
                     query.name().clone(),
                     300, // TTL in seconds
@@ -118,7 +118,7 @@ async fn handle_dns_query(
                     ))
                     .await;
             }
-        }
+        
         response.add_query(query.clone());
     }
 
@@ -157,7 +157,9 @@ async fn handle_dns_query(
 // Forward to system DNS with fallback
 async fn forward_to_system_dns(data: &[u8], logger: &Arc<DnsLogger>) -> anyhow::Result<Vec<u8>> {
     let mut server = String::from("8.8.8.8");
-    if let Ok(dns_ip) = env::var("fallback") {server =dns_ip}
+    if let Ok(dns_ip) = env::var("fallback") {
+        server = dns_ip
+    }
     match try_dns_server(data, &server).await {
         Ok(response) => Ok(response),
         Err(e) => {
