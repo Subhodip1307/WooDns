@@ -59,6 +59,8 @@ This project is still under active development.
 
 - **Option B: Build from Source**
 
+WooDns requires **Rust 1.89.0 or later**.
+
   ```sh
   git clone https://github.com/Subhodip1307/WooDns.git
   cd WooDns
@@ -207,10 +209,10 @@ No more looking up or hardcoding container IPs—just use the container name wit
 
 ## 🤝 Contributing
 
-Bugs, feature requests, and PRs are very welcome!  
-Please open an issue or submit a pull request.
+Contributions are welcome!  
+Please read our [Contributing Guide](CONTRIBUTING.md) to get started.
 
----
+--
 
 ## 📄 License
 
@@ -218,3 +220,4 @@ MIT License.
 See [LICENSE](./LICENSE) for details.
 
 ---
+

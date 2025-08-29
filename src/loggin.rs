@@ -22,12 +22,7 @@ impl DnsLogger {
     pub fn new(file_path: String) -> Result<Self, std::io::Error> {
         std::fs::create_dir_all(format!("{file_path}/woodns"))?;
         let formated_file_path = format!("{file_path}/woodns/output.log");
-        let mut lines_numbers = 0;
-
-        if let Ok(lines) = count_lines_simple(&formated_file_path) {
-            lines_numbers = lines;
-        }
-
+        let lines_numbers = count_lines_simple(&formated_file_path).unwrap_or(0);
         let file = OpenOptions::new()
             .create(true)
             .append(true)
@@ -69,6 +64,6 @@ impl DnsLogger {
         let _ = file.write_all(log_line.as_bytes());
         let _ = file.flush();
         // Also print to console
-        println!("{}", log_line.trim());
+        // println!("{}", log_line.trim());
     }
 }

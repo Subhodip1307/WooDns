@@ -78,23 +78,26 @@ async fn handle_stopped_container(
     data: &Arc<RwLock<HashMap<String, String>>>,
     logger: Arc<DnsLogger>,
 ) -> Result<(), ()> {
-    if let Some(actor) = &event.actor &&
-        let Some(attributes) = &actor.attributes &&
-             let Some(name) = attributes.get("name") {
-                // name = stoped container name
-                let mut map_write = data.write().await;
-                if (map_write.remove(&format!("{name}.docker."))).is_some() {
-                    logger
-                        .log(&format!("docker Container Stoped: {name} "))
-                        .await;
-                    logger.log(&format!("{name} Removed from DNS list")).await;
-                } else {
-                    println!("{name} Not found in DNS List");
-                }
-                return Ok(());
-            }
-        
-    
+    if let Some(actor) = &event.actor
+        && let Some(attributes) = &actor.attributes
+        && let Some(name) = attributes.get("name")
+    {
+        // name = stoped container name
+        let remove_data = {
+            let mut map_write = data.write().await;
+            map_write.remove(&format!("{name}.docker."))
+        };
+        if (remove_data).is_some() {
+            logger
+                .log(&format!("docker Container Stoped: {name} "))
+                .await;
+            logger.log(&format!("{name} Removed from DNS list")).await;
+        } else {
+            println!("{name} Not found in DNS List");
+        }
+        return Ok(());
+    }
+
     Err(())
 }
 
@@ -104,26 +107,27 @@ async fn handle_started_container(
     data: &Arc<RwLock<HashMap<String, String>>>,
     logger: Arc<DnsLogger>,
 ) -> Result<(), ()> {
-    if let Some(actor) = &event.actor &&
-        let Some(attributes) = &actor.attributes 
-           && let Some(name) = attributes.get("name") {
-                logger
-                    .log(&format!("New Docker Container detected {name}"))
-                    .await;
-                // getting the Ip of the new contaienr
-                if let Some(container_ip_address) = get_container_ip(docker, name).await {
-                    let mut map_write = data.write().await; //write data into the stroage
-                    logger
-                        .log(&format!(
-                            "container name is {name} and it's ip is {container_ip_address}"
-                        ))
-                        .await;
-                    map_write.insert(format!("{name}.docker."), container_ip_address);
-                }
+    if let Some(actor) = &event.actor
+        && let Some(attributes) = &actor.attributes
+        && let Some(name) = attributes.get("name")
+    {
+        logger
+            .log(&format!("New Docker Container detected {name}"))
+            .await;
+        // getting the Ip of the new contaienr
+        if let Some(container_ip_address) = get_container_ip(docker, name).await {
+            logger
+                .log(&format!(
+                    "container name is {name} and it's ip is {container_ip_address}"
+                ))
+                .await;
+            let mut map_write = data.write().await; //write data 
+            map_write.insert(format!("{name}.docker."), container_ip_address);
+        }
 
-                return Ok(());
-            }
-    
+        return Ok(());
+    }
+
     Err(())
 }
 
