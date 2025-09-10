@@ -4,6 +4,7 @@ use tokio::sync::RwLock;
 mod dns_handler;
 mod docker;
 mod loggin;
+mod response_handler;
 use dashmap::DashMap;
 use dns_handler::{DNSManager, RemoteDnsCache, remove_cache};
 use docker::{event_monitor, gather_docker};
@@ -55,14 +56,16 @@ async fn main() -> anyhow::Result<()> {
         let socket = Arc::clone(&socket);
         let access_logger = Arc::clone(&logger);
 
-        let dns_manager = DNSManager {
-            docker_dns: Arc::clone(&dns_store),
-            logger: access_logger.clone(),
-            remote_dns: Arc::clone(&remote_dns),
-        };
+        let dns_manager = DNSManager::new(
+            Arc::clone(&dns_store),
+            access_logger.clone(),
+            Arc::clone(&remote_dns),
+            src,
+            socket
+        );
 
         tokio::spawn(async move {
-            if let Err(err) = dns_manager.handle_dns_query(data, src, socket).await {
+            if let Err(err) = dns_manager.handle_dns_query(data).await {
                 access_logger
                     .log(&format!("Error handling query from {}: {:?}", src, err))
                     .await;
