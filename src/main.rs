@@ -12,7 +12,7 @@ use loggin::DnsLogger;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    println!("Runing Version 3.0");
+    println!("Runing Version 3.0.1");
     let log_path = env::var("woodns_log_path").unwrap_or(String::from("/var/log"));
 
     let logger = Arc::new(DnsLogger::new(log_path)?);

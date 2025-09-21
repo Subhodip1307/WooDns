@@ -64,6 +64,8 @@ impl DnsLogger {
         let _ = file.write_all(log_line.as_bytes());
         let _ = file.flush();
         // Also print to console
-        // println!("{}", log_line.trim());
+        // #[cfg(debug_assertions)]{
+            println!("{}", log_line.trim());
+        //}//print only work on dev time
     }
 }

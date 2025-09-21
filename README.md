@@ -44,7 +44,6 @@ This project is still under active development.
 > Contributions, bug reports, and suggestions are highly welcome!
 
 ---
-
 ## 🚀 Quick Start
 
 ### 1. Download or Build
@@ -212,7 +211,7 @@ No more looking up or hardcoding container IPs—just use the container name wit
 Contributions are welcome!  
 Please read our [Contributing Guide](CONTRIBUTING.md) to get started.
 
---
+---
 
 ## 📄 License
 

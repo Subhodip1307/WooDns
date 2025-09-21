@@ -1,12 +1,11 @@
 // this page will responsible all types of dns activities
 use crate::loggin::DnsLogger;
 use crate::response_handler::ResponseBuilder;
-// use response_handler::ResponseBuilder;
 use dashmap::DashMap;
-use hickory_proto::op::{query, Message, MessageType, OpCode, ResponseCode};
-use hickory_proto::rr::rdata::{self, PTR};
+use hickory_proto::op::{Message};
+use hickory_proto::rr::rdata;
 use hickory_proto::rr::{RData, Record};
-use hickory_proto::serialize::binary::{BinDecodable, BinEncodable, BinEncoder};
+use hickory_proto::serialize::binary::{BinDecodable};
 use std::{collections::HashMap, env, net::SocketAddr, sync::Arc, time::Instant};
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
@@ -16,6 +15,7 @@ use tokio::time::{Duration, sleep, timeout};
 pub enum RemoteReocrds {
     A(std::net::Ipv4Addr),
     AAAA(std::net::Ipv6Addr),
+    PTR(hickory_proto::rr::Name),
 }
 
 #[derive(Debug, Clone)]
@@ -55,33 +55,44 @@ impl DNSManager {
             
             if let Some(entry) = self.remote_dns.get(&query.name().to_ascii())
             {
+            let records=&entry.value().records;
             if query.query_type().to_string()=="A" &&    
-             let RemoteReocrds::A(addr) = entry.value().records{
+             let RemoteReocrds::A(addr) = records{
                 println!("Cache used for A");
                 let record = Record::from_rdata(
                     query.name().clone(),
                     300,
-                    RData::A(hickory_proto::rr::rdata::A(addr)),
+                    RData::A(hickory_proto::rr::rdata::A(*addr)),
                 );
                 let response=self.responce_builder.success_response(request, query.clone(), record)?;
                 self.socket.send_to(&response, self.src).await?;
                 return Ok(());
              }else if query.query_type().to_string()=="AAAA" &&    
-             let RemoteReocrds::AAAA(addr) = entry.value().records {
+             let RemoteReocrds::AAAA(addr) = records {
                 println!("Cache used for AAAA");
                 let record = Record::from_rdata(
                     query.name().clone(),
                     300,
-                    RData::AAAA(hickory_proto::rr::rdata::AAAA(addr)),
+                    RData::AAAA(hickory_proto::rr::rdata::AAAA(*addr)),
                 );
                 let response=self.responce_builder.success_response(request, query.clone(), record)?;
                 self.socket.send_to(&response, self.src).await?;
                 return Ok(());
-             }
+             }//checking for ptr records
+             else if query.query_type().to_string()=="PTR" &&
+             let RemoteReocrds::PTR(addr) = records.clone(){
+                println!("Cache used for PTR");
+                let record = Record::from_rdata(
+                    query.name().clone(),
+                    300,
+                    RData::PTR(hickory_proto::rr::rdata::PTR(addr)),
+                );
+                let response=self.responce_builder.success_response(request, query.clone(), record)?;
+                self.socket.send_to(&response, self.src).await?;
+                return Ok(());
+             }//ptr record done
+
             } //end checking in the dashmap if data is there data will be send  need to remove duplicate codes
-
-
-
             match self.query_remote_dns(&data).await {
             Ok(upstream_bytes) => {
                 self.socket.send_to(&upstream_bytes, self.src).await?;
@@ -94,8 +105,6 @@ impl DNSManager {
                     .await;
             }
         }//end matche
-
-
         }
         Ok(())
         
@@ -114,7 +123,7 @@ impl DNSManager {
             timeout(Duration::from_secs(2), upstream_socket.recv_from(&mut buf)).await;
         match recv_result {
             Ok(Ok((len, _))) => {
-                //return the responce after caching it (only A recrods)
+                //return the responce after caching it 
                 let res: Message = Message::from_bytes(&buf[..len])?;
                 if let Some(ans) = res.answers().first()
                     
@@ -122,6 +131,8 @@ impl DNSManager {
                     match ans.data() {
                         Some(RData::A(rdata::A(ipv4_ref)))=>{
                             let ip_owned=*ipv4_ref;
+                            println!("A The IP of this {} is this {}",ans.name().to_ascii(),ip_owned);
+
                             if let Some(mut entry) = self.remote_dns.get_mut(&ans.name().to_ascii()){
                                     entry.ttl=Instant::now() + Duration::from_secs(100);
                                     entry.records = RemoteReocrds::A(ip_owned);
@@ -133,7 +144,7 @@ impl DNSManager {
                                 self.remote_dns.insert(ans.name().to_ascii(), remote_cache);
                             }
 
-                        }
+                        }//end A
                         Some(RData::AAAA(rdata::AAAA(ipv6_ref)))=>{
                             let ip_owned=*ipv6_ref;
                             println!("AAAA The IP of this {} is this {}",ans.name().to_ascii(),ip_owned);
@@ -147,27 +158,27 @@ impl DNSManager {
                                 };
                                 self.remote_dns.insert(ans.name().to_ascii(), remote_cache);
                             }
-                        }
-                        Some(RData::PTR(ip))=>{
+                        }//end AAAA
+                        Some(RData::PTR(rdata::PTR(ip)))=>{
+                            let real_ip=ip.clone();
                             println!("PTR The IP of this {} is this {}",ans.name().to_ascii(),ip);
+
+                            if let Some(mut entry) = self.remote_dns.get_mut(&ans.name().to_ascii()){
+                                    entry.ttl=Instant::now() + Duration::from_secs(100);
+                                    entry.records = RemoteReocrds::PTR(real_ip);
+                            }else{
+                                let remote_cache = RemoteDnsCache {
+                                    ttl: Instant::now() + Duration::from_secs(100),
+                                    records: RemoteReocrds::PTR(real_ip),
+                                };
+                                self.remote_dns.insert(ans.name().to_ascii(), remote_cache);
+                            }
                         }
                         _=>{
-                            println!("IDK The IP of this {} is this",ans.name().to_ascii());
-
+                            println!("No Need to Store This Type of Addess {}",ans.name().to_ascii());
                         }
                         
                     }  
-                    
-                    
-                    // && let Some(RData::A(ip)) = 
-                    // let remote_cache = RemoteDnsCache {
-                    //     ttl: Instant::now() + Duration::from_secs(100),
-                    //     records: RemoteReocrds::A(ip.to_string().parse::<std::net::Ipv4Addr>()?),
-                    // };
-                    // self.remote_dns.insert(ans.name().to_ascii(), remote_cache);
-
-
-
                 }
                 Ok(buf[..len].to_vec())
             }
