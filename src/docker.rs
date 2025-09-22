@@ -1,4 +1,5 @@
 use crate::loggin::DnsLogger;
+use crate::storage_system::DockerStorage;
 use bollard::Docker;
 use bollard::models::EventMessage;
 use bollard::models::EventMessageTypeEnum;
@@ -8,14 +9,12 @@ use bollard::query_parameters::ListContainersOptionsBuilder;
 use futures_util::stream::StreamExt;
 use std::default::Default;
 use std::error::Error;
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::RwLock;
+use std::sync::Arc;
 
 pub async fn gather_docker(
-    data: Arc<RwLock<HashMap<String, String>>>,
+    data: Arc<DockerStorage>,
     logger: Arc<DnsLogger>,
 ) -> Result<(), Box<dyn Error>> {
-    let mut write_me = data.write().await;
     let docker = Docker::connect_with_socket_defaults().unwrap();
     let options = ListContainersOptionsBuilder::default().all(false).build();
 
@@ -28,7 +27,7 @@ pub async fn gather_docker(
             if let Some(networks) = container.network_settings.and_then(|ns| ns.networks) {
                 for (_, settings) in networks {
                     if let Some(ip_address) = settings.ip_address {
-                        write_me.insert(format!("{name}.docker."), ip_address);
+                        data.set(format!("{name}.docker."), ip_address).await;
                         logger.log(&format!("adding {name}.docker.")).await;
                     }
                 }
@@ -39,34 +38,29 @@ pub async fn gather_docker(
     Ok(())
 }
 
-pub async fn event_monitor(
-    data: Arc<RwLock<HashMap<String, String>>>,
-    event_logger: Arc<DnsLogger>,
-) {
+pub async fn event_monitor(data: Arc<DockerStorage>, event_logger: Arc<DnsLogger>) {
     let docker = Docker::connect_with_socket_defaults().unwrap();
     let mut events = docker.events(Some(EventsOptions::default())).boxed();
 
     while let Some(Ok(event)) = events.next().await {
         let event_log = Arc::clone(&event_logger);
 
-        if event.typ == Some(EventMessageTypeEnum::CONTAINER) {
-            // println!("{:#?}", event);
-            if let Some(ref action) = event.action {
-                match action.as_str() {
-                    "start" => {
-                        if (handle_started_container(&event, &docker, &data, event_log).await)
-                            .is_ok()
-                        {
-                            println!("DNS Record Updated");
-                        } //end ok 
-                    }
-                    "kill" | "die" | "stop" => {
-                        if (handle_stopped_container(&event, &data, event_log).await).is_err() {
-                            println!("Failed to remove container from DNS");
-                        }
-                    }
-                    _ => {}
+        if event.typ == Some(EventMessageTypeEnum::CONTAINER)
+            && let Some(ref action) = event.action
+        {
+            match action.as_str() {
+                "start" => {
+                    if (handle_started_container(&event, &docker, &data, &event_log).await).is_ok()
+                    {
+                        event_log.log("DNS Record Updated").await;
+                    } //end ok 
                 }
+                "kill" | "die" | "stop" => {
+                    if (handle_stopped_container(&event, &data, &event_log).await).is_err() {
+                        event_log.log("Failed to remove container from DNS").await;
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -75,19 +69,16 @@ pub async fn event_monitor(
 // remove the stoped containers from records list
 async fn handle_stopped_container(
     event: &EventMessage,
-    data: &Arc<RwLock<HashMap<String, String>>>,
-    logger: Arc<DnsLogger>,
+    data: &Arc<DockerStorage>,
+    logger: &Arc<DnsLogger>,
 ) -> Result<(), ()> {
     if let Some(actor) = &event.actor
         && let Some(attributes) = &actor.attributes
         && let Some(name) = attributes.get("name")
     {
         // name = stoped container name
-        let remove_data = {
-            let mut map_write = data.write().await;
-            map_write.remove(&format!("{name}.docker."))
-        };
-        if (remove_data).is_some() {
+        let remove_data: bool = { data.remove(&format!("{name}.docker.")).await };
+        if remove_data {
             logger
                 .log(&format!("docker Container Stoped: {name} "))
                 .await;
@@ -104,8 +95,8 @@ async fn handle_stopped_container(
 async fn handle_started_container(
     event: &EventMessage,
     docker: &Docker,
-    data: &Arc<RwLock<HashMap<String, String>>>,
-    logger: Arc<DnsLogger>,
+    data: &Arc<DockerStorage>,
+    logger: &Arc<DnsLogger>,
 ) -> Result<(), ()> {
     if let Some(actor) = &event.actor
         && let Some(attributes) = &actor.attributes
@@ -121,8 +112,8 @@ async fn handle_started_container(
                     "container name is {name} and it's ip is {container_ip_address}"
                 ))
                 .await;
-            let mut map_write = data.write().await; //write data 
-            map_write.insert(format!("{name}.docker."), container_ip_address);
+            data.set(format!("{name}.docker."), container_ip_address)
+                .await; //write data
         }
 
         return Ok(());
