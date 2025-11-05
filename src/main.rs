@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     let log_path = env::var("woodns_log_path").unwrap_or(String::from("/var/log"));
 
     let mut file_haneler = LogHandeler::init(log_path.clone()).await;
-    let logger = Arc::new(DnsLogger::new(tx).await?);
+    let logger = Arc::new(DnsLogger::new(tx).await);
     logger
         .log(&format!("Runing Version {}", env!("CARGO_PKG_VERSION")))
         .await;
@@ -105,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let address = env::var("host").unwrap_or(String::from("127.0.0.13"));
-    let socket = Arc::new(UdpSocket::bind(format!("{}:53", address)).await?);
+    let socket = Arc::new(UdpSocket::bind(format!("{}:53", address)).await.expect(&format!("Unable to operate on {}:53",address)));
     logger
         .log(&format!("DNS server listening on {address} UDP port 53"))
         .await;
@@ -113,7 +113,13 @@ async fn main() -> anyhow::Result<()> {
     let mut buf = [0u8; 512];
 
     loop {
-        let (len, src) = socket.recv_from(&mut buf).await?;
+        let (len, src) =match socket.recv_from(&mut buf).await{
+            Ok((len,src))=>(len,src),
+            Err(e)=>{
+                println!("error whiile receving message {}",e);
+                std::process::exit(0);
+            }
+        };
         let data = buf[..len].to_vec();
         let socket = Arc::clone(&socket);
         let access_logger = Arc::clone(&logger);

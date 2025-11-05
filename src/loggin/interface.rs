@@ -9,11 +9,11 @@ pub struct DnsLogger {
 impl DnsLogger {
     pub async fn new(
         sender_channel: tokio::sync::mpsc::Sender<String>,
-    ) -> Result<Self, std::io::Error> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             sender: sender_channel,
             message_count: Arc::new(AtomicUsize::new(0)),
-        })
+        }
     }
 
     pub async fn log(&self, message: &str) {

@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicU16, Ordering};
-use tokio::fs::OpenOptions as TokioOpenOptions;
+use tokio::fs::{self,OpenOptions as TokioOpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 
 #[cfg(debug_assertions)]
@@ -48,6 +48,7 @@ impl LogHandeler {
         if !logs_vect.is_empty() {
             if self.line_counter.load(Ordering::Relaxed) > MAX_LOG_SIZE {
                 let (new_file_location, _) = decide_file(&self.folder, &self.file_number).await;
+                #[cfg(debug_assertions)]
                 println!("new log file name is {}", new_file_location);
                 self.file = new_file_location;
                 self.line_counter.store(0, Ordering::SeqCst);
@@ -81,29 +82,37 @@ fn get_messages(reciver: &mut tokio::sync::mpsc::Receiver<String>) -> Vec<String
 
 // file line count
 async fn count_file_line(path: &String) -> anyhow::Result<u16> {
-    let file = TokioOpenOptions::new()
+    let file_line_count: u16 = match TokioOpenOptions::new()
         .read(true)
         .create(true)
         .write(true)
         .truncate(false)
         .open(&path)
-        .await?;
+        .await {
+            Ok(e)=>{
+                let metadata = e.metadata().await?;
+                if metadata.len() == 0 {
+                    return Ok(0);
+                }
 
-    let metadata = file.metadata().await?;
-    if metadata.len() == 0 {
-        return Ok(0);
-    }
+                let reader = BufReader::new(e);
+                let mut lines = reader.lines();
+                let mut count: u16 = 0;
 
-    let reader = BufReader::new(file);
-    let mut lines = reader.lines();
-    let mut count: u16 = 0;
-
-    while (lines.next_line().await?).is_some() {
-        count += 1;
-    }
-
-    Ok(count)
+                while (lines.next_line().await?).is_some() {
+                    count += 1;
+                }
+                count
+            },
+            Err(_)=>{
+                fs::remove_dir_all(path).await.ok();
+                fs::create_dir(path).await?;
+                0
+            }
+        };
+    Ok(file_line_count)
 }
+
 // decide file name
 async fn decide_file(folder_path: &String, files_count: &AtomicU16) -> (String, u16) {
     let files_numbers = files_count.load(Ordering::Relaxed);
