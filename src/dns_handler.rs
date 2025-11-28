@@ -28,7 +28,7 @@ pub struct DNSManager {
     pub docker_dns: Arc<DockerStorage>,
     pub logger: Arc<DnsLogger>,
     pub remote_dns: Arc<DashMap<String, RemoteDnsCache>>,
-    responce_builder: ResponseBuilder,
+    response_builder: ResponseBuilder,
     src: SocketAddr,
     socket: Arc<UdpSocket>,
 }
@@ -47,12 +47,12 @@ impl DNSManager {
             docker_dns: docker,
             logger: log,
             remote_dns: remote,
-            responce_builder: ResponseBuilder,
+            response_builder: ResponseBuilder,
         }
     }
 
     pub async fn handle_dns_query(&self, data: Vec<u8>) -> anyhow::Result<()> {
-        let request = self.responce_builder.deserialize(&data)?;
+        let request = self.response_builder.deserialize(&data)?;
         //TODO: future: use for..loop instade of just .first()
         if let Some(query) = request.queries().first().cloned() {
             // checking if the query is .ends with docker
@@ -73,7 +73,7 @@ impl DNSManager {
                         RData::A(hickory_proto::rr::rdata::A(*addr)),
                     );
                     let response =
-                        self.responce_builder
+                        self.response_builder
                             .success_response(request, query.clone(), record)?;
                     self.socket.send_to(&response, self.src).await?;
                     return Ok(());
@@ -88,7 +88,7 @@ impl DNSManager {
                         RData::AAAA(hickory_proto::rr::rdata::AAAA(*addr)),
                     );
                     let response =
-                        self.responce_builder
+                        self.response_builder
                             .success_response(request, query.clone(), record)?;
                     self.socket.send_to(&response, self.src).await?;
                     return Ok(());
@@ -105,7 +105,7 @@ impl DNSManager {
                         RData::PTR(hickory_proto::rr::rdata::PTR(addr)),
                     );
                     let response =
-                        self.responce_builder
+                        self.response_builder
                             .success_response(request, query.clone(), record)?;
                     self.socket.send_to(&response, self.src).await?;
                     return Ok(());
@@ -116,7 +116,7 @@ impl DNSManager {
                     self.socket.send_to(&upstream_bytes, self.src).await?;
                 }
                 Err(err) => {
-                    let resp_buffer = self.responce_builder.error_res(request.clone(), query)?;
+                    let resp_buffer = self.response_builder.error_res(request.clone(), query)?;
                     self.socket.send_to(&resp_buffer, self.src).await?;
                     self.logger
                         .log(&format!(
@@ -146,7 +146,7 @@ impl DNSManager {
             timeout(Duration::from_secs(5), upstream_socket.recv_from(&mut buf)).await;
         match recv_result {
             Ok(Ok((len, _))) => {
-                //return the responce after caching it
+                //return the response after caching it
                 let res: Message = Message::from_bytes(&buf[..len])?;
                 if let Some(ans) = res.answers().first() {
                     match ans.data() {
@@ -237,7 +237,7 @@ impl DNSManager {
     {
         let record_exists: bool = { self.docker_dns.contains(&query.name().to_ascii()).await };
         if !record_exists {
-            let resp_buf = self.responce_builder.nxdomain(request, query.clone())?;
+            let resp_buf = self.response_builder.nxdomain(request, query.clone())?;
             self.socket.send_to(&resp_buf, self.src).await?;
             return Ok(());
         } else if query.query_type().to_string() == "A" {
@@ -251,7 +251,7 @@ impl DNSManager {
                     RData::A(hickory_proto::rr::rdata::A(ip_address)),
                 );
                 let response =
-                    self.responce_builder
+                    self.response_builder
                         .success_response(request, query.clone(), record)?;
                 self.socket.send_to(&response, self.src).await?;
                 self.logger
@@ -266,7 +266,7 @@ impl DNSManager {
         } //if to check record type
         // unknown types
         let resp_buf = self
-            .responce_builder
+            .response_builder
             .record_not_found(request, query.clone())?;
         self.socket.send_to(&resp_buf, self.src).await?;
         self.logger

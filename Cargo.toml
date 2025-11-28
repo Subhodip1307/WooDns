@@ -16,6 +16,9 @@ tokio = { version = "1.46.1", features = ["full"] }
 hickory-proto = "0.24"
 hickory-resolver = "0.24"
 futures-util = "0.3"
-log = "0.4.27"
 chrono = { version = "0.4", features = ["clock"] }
 dashmap = "6.1.0"
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"

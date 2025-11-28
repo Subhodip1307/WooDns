@@ -8,17 +8,17 @@ const MAX_LOG_SIZE: u16 = 100;
 #[cfg(not(debug_assertions))]
 const MAX_LOG_SIZE: u16 = 1000;
 
-pub struct LogHandeler {
+pub struct LogHandler {
     file: String, //full file path
     folder: String,
     pub file_number: AtomicU16,
     pub line_counter: AtomicU16,
 }
 
-impl LogHandeler {
+impl LogHandler {
     pub async fn init(location: String) -> Self {
         /*
-        Create LogHandeler obj and return that and also decide the log file name
+        Create LogHandler obj and return that and also decide the log file name
          */
         let folder_path = format!("{location}/woodns");
         tokio::fs::create_dir_all(&folder_path).await.unwrap();
@@ -43,8 +43,8 @@ impl LogHandeler {
             file_number: AtomicU16::new(files_count),
         }
     }
-    pub async fn bluk_write(&mut self, reciver: &mut tokio::sync::mpsc::Receiver<String>) {
-        let logs_vect = get_messages(reciver);
+    pub async fn bulk_write(&mut self, receiver: &mut tokio::sync::mpsc::Receiver<String>) {
+        let logs_vect = get_messages(receiver);
         if !logs_vect.is_empty() {
             if self.line_counter.load(Ordering::Relaxed) > MAX_LOG_SIZE {
                 let (new_file_location, _) = decide_file(&self.folder, &self.file_number).await;
@@ -72,9 +72,9 @@ impl LogHandeler {
     }
 }
 // get all messages
-fn get_messages(reciver: &mut tokio::sync::mpsc::Receiver<String>) -> Vec<String> {
+fn get_messages(receiver: &mut tokio::sync::mpsc::Receiver<String>) -> Vec<String> {
     let mut logs_vect: Vec<String> = Vec::new();
-    while let Ok(msg) = reciver.try_recv() {
+    while let Ok(msg) = receiver.try_recv() {
         logs_vect.push(msg);
     }
     logs_vect
@@ -147,8 +147,8 @@ pub async fn get_file_count(folder: &String) -> anyhow::Result<u16> {
     Ok(count)
 }
 
-pub async fn all_write_now(file_path: String, reciver: &mut tokio::sync::mpsc::Receiver<String>) {
-    let logs_vect = get_messages(reciver);
+pub async fn all_write_now(file_path: String, receiver: &mut tokio::sync::mpsc::Receiver<String>) {
+    let logs_vect = get_messages(receiver);
     let file = TokioOpenOptions::new()
         .create(true)
         .append(true)

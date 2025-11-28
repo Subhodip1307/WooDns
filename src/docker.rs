@@ -66,7 +66,7 @@ pub async fn event_monitor(data: Arc<DockerStorage>, event_logger: Arc<DnsLogger
     }
 }
 
-// remove the stoped containers from records list
+// remove the stopped containers from records list
 async fn handle_stopped_container(
     event: &EventMessage,
     data: &Arc<DockerStorage>,
@@ -76,11 +76,11 @@ async fn handle_stopped_container(
         && let Some(attributes) = &actor.attributes
         && let Some(name) = attributes.get("name")
     {
-        // name = stoped container name
+        // name = stopped container name
         let remove_data: bool = { data.remove(&format!("{name}.docker.")).await };
         if remove_data {
             logger
-                .log(&format!("docker Container Stoped: {name} "))
+                .log(&format!("docker Container stopped: {name} "))
                 .await;
             logger.log(&format!("{name} Removed from DNS list")).await;
         } else {

@@ -1700,12 +1700,15 @@ version = "3.1.0"
 dependencies = [
  "anyhow",
  "bollard",
+ "bytes",
  "chrono",
  "dashmap",
  "futures-util",
  "hickory-proto",
  "hickory-resolver",
- "log",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
  "tokio",
 ]
 

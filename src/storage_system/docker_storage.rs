@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
+#[derive(Debug,Clone)]
 pub struct DockerStorage {
     container: Arc<RwLock<HashMap<String, String>>>,
 }
@@ -26,5 +27,9 @@ impl DockerStorage {
     pub async fn remove(&self, query: &String) -> bool {
         let mut data_writer = self.container.write().await;
         data_writer.remove(query).is_some()
+    }
+    pub async fn list_all(&self)->HashMap<String,String>{
+        let data_reader = self.container.read().await;
+        data_reader.clone()
     }
 }
