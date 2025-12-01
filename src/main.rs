@@ -44,12 +44,16 @@ async fn main() -> anyhow::Result<()> {
 
     //shutdown handel
     {
+        let batch_log_collection = Arc::clone(&logger);
         let log_receiver = Arc::clone(&rx);
         tokio::spawn(async move {
             signal::ctrl_c().await.expect("failed to listen for event");
             println!("Going to shutdown, writing all logs");
             let file_name: String = {
-                let files_numbers = get_file_count(&log_path).await.unwrap();
+                let files_numbers =match get_file_count(&log_path).await{
+                    Ok(count)=>count,
+                    Err(err)=>{batch_log_collection.log(&format!("error while trying to get file count  {}",err)).await;1}
+                };
                 if files_numbers <= 1 {
                     format!("{}/woodns/output.log", log_path)
                 } else {
