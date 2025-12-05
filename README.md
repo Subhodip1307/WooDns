@@ -44,6 +44,8 @@ This project is still under active development.
 > Contributions, bug reports, and suggestions are highly welcome!
 
 ---
+📌 **Upgrade Guide Available** → See the full instructions [here](./UPGRADE.md)
+
 ## 🚀 Quick Start
 
 ### 1. Download or Build

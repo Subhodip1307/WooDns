@@ -6,6 +6,7 @@ mod docker;
 mod loggin;
 mod response_handler;
 mod access_api;
+mod scoket_pool;
 use access_api::access;
 use dashmap::DashMap;
 use dns_handler::{DNSManager, RemoteDnsCache, remove_cache};

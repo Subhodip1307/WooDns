@@ -7,9 +7,9 @@ use hickory_proto::op::Message;
 use hickory_proto::rr::rdata;
 use hickory_proto::rr::{RData, Record};
 use hickory_proto::serialize::binary::BinDecodable;
-use std::{env, net::SocketAddr, sync::Arc, time::Instant};
+use std::{env, net::SocketAddr, sync::Arc};
 use tokio::net::UdpSocket;
-use tokio::time::{Duration, interval, timeout};
+use tokio::time::{Duration, Instant,interval, timeout};
 
 #[derive(Debug, Clone)]
 pub enum RemoteReocrds {

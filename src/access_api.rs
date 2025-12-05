@@ -66,7 +66,7 @@ pub async fn access(remote:Arc<DashMap<String, RemoteDnsCache>>,docker:Arc<Docke
                         (200, let_the, "application/txt")
                     },
                     _ =>{
-                    (200, json_body("subho\ntrisha"), "application/txt")
+                    (200, json_body("Method:\tGET\nURL\t/ld\t/lr"), "application/txt")
                     },
                 };                
                 
