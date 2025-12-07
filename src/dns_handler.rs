@@ -1,4 +1,5 @@
 // this page will responsible all types of dns activities
+use crate::SocketPool;
 use crate::loggin::DnsLogger;
 use crate::response_handler::ResponseBuilder;
 use crate::storage_system::DockerStorage;
@@ -9,7 +10,7 @@ use hickory_proto::rr::{RData, Record};
 use hickory_proto::serialize::binary::BinDecodable;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::net::UdpSocket;
-use tokio::time::{Duration, Instant,interval, timeout};
+use tokio::time::{Duration, Instant, interval, timeout};
 
 #[derive(Debug, Clone)]
 pub enum RemoteReocrds {
@@ -31,6 +32,7 @@ pub struct DNSManager {
     response_builder: ResponseBuilder,
     src: SocketAddr,
     socket: Arc<UdpSocket>,
+    rc: Arc<SocketPool>,
 }
 
 impl DNSManager {
@@ -40,6 +42,7 @@ impl DNSManager {
         remote: Arc<DashMap<String, RemoteDnsCache>>,
         source: SocketAddr,
         socket_addr: Arc<UdpSocket>,
+        rc: Arc<SocketPool>,
     ) -> Self {
         Self {
             src: source,
@@ -48,6 +51,7 @@ impl DNSManager {
             logger: log,
             remote_dns: remote,
             response_builder: ResponseBuilder,
+            rc: rc,
         }
     }
 
@@ -60,7 +64,7 @@ impl DNSManager {
                 return self.docker_resolve(request, query).await;
             } //not ends with .docker
 
-            if let Some(entry) = self.remote_dns.get(&query.name().to_ascii()) {
+            if let Some(entry) = self.remote_dns.get( &query.name().to_ascii()) {
                 let records = &entry.value().records;
                 if query.query_type().to_string() == "A"
                     && let RemoteReocrds::A(addr) = records
@@ -138,12 +142,13 @@ impl DNSManager {
         // query the remote dns server
         let server = env::var("fallback").unwrap_or(String::from("8.8.8.8:53"));
         //sending request to fallback dns
-        let upstream_socket = UdpSocket::bind("0.0.0.0:0").await?;
+        let upstream_socket = self.rc.open().await;
         upstream_socket.send_to(data, server).await?;
 
         let mut buf = [0u8; 512];
         let recv_result =
             timeout(Duration::from_secs(5), upstream_socket.recv_from(&mut buf)).await;
+        self.rc.close(upstream_socket).await;
         match recv_result {
             Ok(Ok((len, _))) => {
                 //return the response after caching it

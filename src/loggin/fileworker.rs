@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicU16, Ordering};
-use tokio::fs::{self,OpenOptions as TokioOpenOptions};
+use tokio::fs::{self, OpenOptions as TokioOpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 
 #[cfg(debug_assertions)]
@@ -88,28 +88,29 @@ async fn count_file_line(path: &String) -> anyhow::Result<u16> {
         .write(true)
         .truncate(false)
         .open(&path)
-        .await {
-            Ok(e)=>{
-                let metadata = e.metadata().await?;
-                if metadata.len() == 0 {
-                    return Ok(0);
-                }
-
-                let reader = BufReader::new(e);
-                let mut lines = reader.lines();
-                let mut count: u16 = 0;
-
-                while (lines.next_line().await?).is_some() {
-                    count += 1;
-                }
-                count
-            },
-            Err(_)=>{
-                fs::remove_dir_all(path).await.ok();
-                fs::create_dir(path).await?;
-                0
+        .await
+    {
+        Ok(e) => {
+            let metadata = e.metadata().await?;
+            if metadata.len() == 0 {
+                return Ok(0);
             }
-        };
+
+            let reader = BufReader::new(e);
+            let mut lines = reader.lines();
+            let mut count: u16 = 0;
+
+            while (lines.next_line().await?).is_some() {
+                count += 1;
+            }
+            count
+        }
+        Err(_) => {
+            fs::remove_dir_all(path).await.ok();
+            fs::create_dir(path).await?;
+            0
+        }
+    };
     Ok(file_line_count)
 }
 

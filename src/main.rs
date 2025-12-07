@@ -1,24 +1,24 @@
 use std::{env, sync::Arc};
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
+mod access_api;
 mod dns_handler;
 mod docker;
 mod loggin;
 mod response_handler;
-mod access_api;
 mod scoket_pool;
 use access_api::access;
 use dashmap::DashMap;
 use dns_handler::{DNSManager, RemoteDnsCache, remove_cache};
 use docker::{event_monitor, gather_docker};
 use loggin::{DnsLogger, LogHandler, all_write_now, get_file_count};
+use scoket_pool::SocketPool;
 mod storage_system;
 use std::sync::atomic::Ordering;
 use storage_system::DockerStorage;
 use tokio::signal;
 use tokio::sync::mpsc;
 use tokio::time::{Duration, interval};
-
 
 #[cfg(debug_assertions)]
 const MAX_MESSAGE_BATCH_SIZE: usize = 10;
@@ -51,9 +51,14 @@ async fn main() -> anyhow::Result<()> {
             signal::ctrl_c().await.expect("failed to listen for event");
             println!("Going to shutdown, writing all logs");
             let file_name: String = {
-                let files_numbers =match get_file_count(&log_path).await{
-                    Ok(count)=>count,
-                    Err(err)=>{batch_log_collection.log(&format!("error while trying to get file count  {}",err)).await;1}
+                let files_numbers = match get_file_count(&log_path).await {
+                    Ok(count) => count,
+                    Err(err) => {
+                        batch_log_collection
+                            .log(&format!("error while trying to get file count  {}", err))
+                            .await;
+                        1
+                    }
                 };
                 if files_numbers <= 1 {
                     format!("{}/woodns/output.log", log_path)
@@ -66,8 +71,6 @@ async fn main() -> anyhow::Result<()> {
             std::process::exit(0);
         });
     }
-
-
 
     // log batch process
     {
@@ -114,31 +117,48 @@ async fn main() -> anyhow::Result<()> {
         }); //track and remove cache
     }
 
-    {//the simple api interface
+    {
+        //the simple api interface
         let remote_data = Arc::clone(&remote_dns);
-        let  docker_data= Arc::clone(&dns_store);
+        let docker_data = Arc::clone(&dns_store);
         tokio::spawn(async move {
-            let _ =access(remote_data,docker_data).await;
+            let _ = access(remote_data, docker_data).await;
         });
-
-
     }
 
     let address = env::var("host").unwrap_or(String::from("127.0.0.13"));
-    let socket = Arc::new(UdpSocket::bind(format!("{}:53", address)).await.expect(&format!("Unable to operate on {}:53",address)));
+    let socket = Arc::new(
+        UdpSocket::bind(format!("{}:53", address))
+            .await
+            .expect(&format!("Unable to operate on {}:53", address)),
+    );
     logger
         .log(&format!("DNS server listening on {address} UDP port 53"))
         .await;
 
     let mut buf = [0u8; 512];
     // opening socket
-   
+
+    // socket pooling
+    let remote_sockets = Arc::new(SocketPool::init(10).await);
+
+    {
+        let all_scokets = Arc::clone(&remote_sockets);
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(60));
+            ticker.tick().await;
+            loop {
+                all_scokets.remove_scoket().await;
+                ticker.tick().await;
+            }
+        });
+    }
 
     loop {
-        let (len, src) =match socket.recv_from(&mut buf).await{
-            Ok((len,src))=>(len,src),
-            Err(e)=>{
-                println!("error whiile receving message {}",e);
+        let (len, src) = match socket.recv_from(&mut buf).await {
+            Ok((len, src)) => (len, src),
+            Err(e) => {
+                println!("error whiile receving message {}", e);
                 std::process::exit(0);
             }
         };
@@ -152,6 +172,7 @@ async fn main() -> anyhow::Result<()> {
             Arc::clone(&remote_dns),
             src,
             socket,
+            Arc::clone(&remote_sockets),
         );
 
         tokio::spawn(async move {

@@ -7,9 +7,7 @@ pub struct DnsLogger {
 }
 
 impl DnsLogger {
-    pub async fn new(
-        sender_channel: tokio::sync::mpsc::Sender<String>,
-    ) -> Self {
+    pub async fn new(sender_channel: tokio::sync::mpsc::Sender<String>) -> Self {
         Self {
             sender: sender_channel,
             message_count: Arc::new(AtomicUsize::new(0)),

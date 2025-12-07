@@ -23,7 +23,7 @@ pub async fn gather_docker(
     for container in containers {
         // getting the container names
         if let Some(names_array) = container.names {
-            let name = names_array[0].trim_start_matches("/"); //container name
+            let name = names_array[0].trim_start_matches("/").replace("_", "-"); //container name
             if let Some(networks) = container.network_settings.and_then(|ns| ns.networks) {
                 for (_, settings) in networks {
                     if let Some(ip_address) = settings.ip_address {
