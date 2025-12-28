@@ -14,14 +14,11 @@ impl DockerStorage {
     }
     pub async fn get(&self, query: &String) -> Option<String> {
         if let Some(data) = self.container.get(query) {
-            return Some(data.value().clone());
+            Some(data.value().clone())
         } else {
-            if let Some(data) = self.container.get(&query.replace('_', "-")) {
-                return Some(data.value().clone());
-            } else {
-                None
+            self.container.get(&query.replace('_', "-")).map(|data| data.value().clone())
             }
-        }
+        
     }
     pub async fn set(&self, query: String, value: String) {
         self.container.insert(query, value);

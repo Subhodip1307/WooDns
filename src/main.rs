@@ -2,23 +2,24 @@ use std::{env, sync::Arc};
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 mod access_api;
-mod dns_handler;
+mod handler;
+use handler::{dns_handler, response_handler};
 mod docker;
 mod loggin;
-mod response_handler;
-mod scoket_pool;
+mod socket_pool;
 use access_api::access;
 use dashmap::DashMap;
 use dns_handler::{DNSManager, RemoteDnsCache, remove_cache};
 use docker::{event_monitor, gather_docker};
 use loggin::{DnsLogger, LogHandler, all_write_now, get_file_count};
-use scoket_pool::SocketPool;
+use socket_pool::SocketPool;
 mod storage_system;
 use std::sync::atomic::Ordering;
 use storage_system::DockerStorage;
 use tokio::signal;
 use tokio::sync::mpsc;
 use tokio::time::{Duration, interval};
+// mod worker;
 
 #[cfg(debug_assertions)]
 const MAX_MESSAGE_BATCH_SIZE: usize = 10;
@@ -130,7 +131,7 @@ async fn main() -> anyhow::Result<()> {
     let socket = Arc::new(
         UdpSocket::bind(format!("{}:53", address))
             .await
-            .expect(&format!("Unable to operate on {}:53", address)),
+            .unwrap_or_else(|_| panic!("Unable to operate on {}:53", address))
     );
     logger
         .log(&format!("DNS server listening on {address} UDP port 53"))
@@ -143,12 +144,12 @@ async fn main() -> anyhow::Result<()> {
     let remote_sockets = Arc::new(SocketPool::init(10).await);
 
     {
-        let all_scokets = Arc::clone(&remote_sockets);
+        let all_sockets = Arc::clone(&remote_sockets);
         tokio::spawn(async move {
             let mut ticker = interval(Duration::from_secs(60));
             ticker.tick().await;
             loop {
-                all_scokets.remove_scoket().await;
+                all_sockets.remove_socket().await;
                 ticker.tick().await;
             }
         });

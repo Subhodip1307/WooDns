@@ -51,7 +51,7 @@ impl DNSManager {
             logger: log,
             remote_dns: remote,
             response_builder: ResponseBuilder,
-            rc: rc,
+            rc
         }
     }
 
@@ -64,7 +64,7 @@ impl DNSManager {
                 return self.docker_resolve(request, query).await;
             } //not ends with .docker
 
-            if let Some(entry) = self.remote_dns.get( &query.name().to_ascii()) {
+            if let Some(entry) = self.remote_dns.get(&query.name().to_ascii()) {
                 let records = &entry.value().records;
                 if query.query_type().to_string() == "A"
                     && let RemoteReocrds::A(addr) = records
@@ -290,11 +290,11 @@ pub async fn remove_cache(data: Arc<DashMap<String, RemoteDnsCache>>) {
     // will use .retain in future
     let mut ticker = interval(Duration::from_secs(5));
     loop {
-        let currnet = Instant::now();
+        let current = Instant::now();
         let keys_to_remove: Vec<String> = data
             .iter()
             .filter_map(|f| {
-                if f.value().ttl <= currnet {
+                if f.value().ttl <= current {
                     Some(f.key().clone())
                 } else {
                     None
