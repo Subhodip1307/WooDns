@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicU16, Ordering};
 use tokio::fs::{self, OpenOptions as TokioOpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::sync::Mutex;
 
 #[cfg(debug_assertions)]
 const MAX_LOG_SIZE: u16 = 100;
@@ -9,14 +10,14 @@ const MAX_LOG_SIZE: u16 = 100;
 const MAX_LOG_SIZE: u16 = 1000;
 
 pub struct LogHandler {
-    file: String, //full file path
+    file: Mutex<String>, //full file path
     folder: String,
     pub file_number: AtomicU16,
     pub line_counter: AtomicU16,
 }
 
 impl LogHandler {
-    pub async fn init(location: String) -> Self {
+    pub async fn init(location:&String) -> Self {
         /*
         Create LogHandler obj and return that and also decide the log file name
          */
@@ -27,7 +28,7 @@ impl LogHandler {
             let file_name = format!("{}/output.log", folder_path);
             let line_count = count_file_line(&file_name).await.unwrap();
             return Self {
-                file: file_name,
+                file: Mutex::new(file_name),
                 line_counter: AtomicU16::new(line_count),
                 folder: folder_path,
                 file_number: AtomicU16::new(files_count),
@@ -37,26 +38,28 @@ impl LogHandler {
         let (file_name, line_count) = decide_file(&folder_path, &AtomicU16::new(files_count)).await;
 
         Self {
-            file: file_name,
+            file: Mutex::new(file_name),
             line_counter: AtomicU16::new(line_count),
             folder: folder_path,
             file_number: AtomicU16::new(files_count),
         }
     }
-    pub async fn bulk_write(&mut self, receiver: &mut tokio::sync::mpsc::Receiver<String>) {
+    pub async fn bulk_write(&self, receiver: &mut tokio::sync::mpsc::Receiver<String>) {
         let logs_vect = get_messages(receiver);
         if !logs_vect.is_empty() {
             if self.line_counter.load(Ordering::Relaxed) > MAX_LOG_SIZE {
                 let (new_file_location, _) = decide_file(&self.folder, &self.file_number).await;
                 #[cfg(debug_assertions)]
                 println!("new log file name is {}", new_file_location);
-                self.file = new_file_location;
+                let mut the_file=self.file.lock().await;
+                    *the_file = new_file_location;
                 self.line_counter.store(0, Ordering::SeqCst);
             }
+            let the_log_file=self.file.lock().await.clone();
             let file = TokioOpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(&self.file)
+                .open(&the_log_file)
                 .await
                 .unwrap();
             let mut writer = BufWriter::new(file);
